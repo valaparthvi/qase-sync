@@ -1,0 +1,24 @@
+{
+  "name": "qase-sync",
+  "version": "1.0.0",
+  "description": "Keeps the Qase IDs in a Cypress project's specs in sync with its Qase TestOps project",
+  "type": "module",
+  "license": "Apache-2.0",
+  "bin": {
+    "qase-sync": "./qase-sync.mjs"
+  },
+  "files": [
+    "qase-sync.mjs",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "qase-sync": "node qase-sync.mjs",
+    "test": "node test/run.mjs"
+  },
+  "dependencies": {
+    "ts-morph": "^28.0.0"
+  }
+}
