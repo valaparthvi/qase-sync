@@ -25,14 +25,19 @@ It compares the specs against the live Qase project and reports:
 
 ## Installing
 
-Once this repo is on GitHub, nothing needs to be vendored into the project being synced:
+Nothing needs to be vendored into the project being synced — it installs straight from git,
+so there is no npm registry involved:
 
 ```
-npx github:<owner>/qase-sync --fix          # one-off
-npm i -D github:<owner>/qase-sync#v1.0.0    # pinned, then: npx qase-sync --fix
+npx --yes github:valaparthvi/qase-sync#v1.0.0 --fix    # one-off, pinned to a tag
+npm i -D github:valaparthvi/qase-sync#v1.0.0           # then: npx qase-sync --fix
 ```
 
-From a local checkout, before any of that exists:
+Pin to a tag. Without the `#v1.0.0` you silently track whatever is on the default branch, and
+a git install resolves `ts-morph` fresh rather than from this repo's lockfile, so the tag is
+the only thing holding a consumer steady.
+
+From a local checkout instead:
 
 ```
 npm i -D /path/to/qase-sync    # or: (cd /path/to/qase-sync && npm link) then npm link qase-sync
@@ -50,6 +55,10 @@ Run it **from the project being synced** — anywhere at or below that project's
 `qase-sync.config.json` — not from the directory this tool is installed in. The config is
 found by walking up from the working directory, and the working directory is the only thing
 that decides which project gets read.
+
+Pass flags directly: `npx qase-sync --fix`, never `npx qase-sync -- --fix`. npx forwards the
+`--` through as a literal argument, and unrecognised arguments are rejected rather than
+ignored — a dropped `--fix` would otherwise look like a clean report instead of a repair.
 
 ## Configuration
 
@@ -136,7 +145,7 @@ jobs:
           QASE_API_TOKEN: ${{ secrets.QASE_API_TOKEN }}
         run: |
           EXIT_CODE=0
-          npx --yes github:<owner>/qase-sync --fix || EXIT_CODE=$?
+          npx --yes github:valaparthvi/qase-sync#v1.0.0 --fix || EXIT_CODE=$?
           # Above 1 is a genuine failure; 1 just means something was left for a person.
           [ "${EXIT_CODE}" -gt 1 ] && exit "${EXIT_CODE}"
           exit 0
@@ -144,6 +153,9 @@ jobs:
 
 `npx` runs from the repository root, which is where the consuming project's
 `qase-sync.config.json` lives, so nothing else needs configuring.
+
+This only works while **this repo is public**. A consumer's `GITHUB_TOKEN` is scoped to its
+own repository, so installing from a private tool repo would need a PAT and git URL rewriting.
 
 That leaves the repaired specs uncommitted. For a fuller worked example — committing the fixes
 to a throwaway branch, opening or updating a PR with the report in its body, and failing the

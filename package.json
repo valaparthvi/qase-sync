@@ -4,6 +4,14 @@
   "description": "Keeps the Qase IDs in a Cypress project's specs in sync with its Qase TestOps project",
   "type": "module",
   "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/valaparthvi/qase-sync.git"
+  },
+  "bugs": {
+    "url": "https://github.com/valaparthvi/qase-sync/issues"
+  },
+  "homepage": "https://github.com/valaparthvi/qase-sync#readme",
   "bin": {
     "qase-sync": "./qase-sync.mjs"
   },
