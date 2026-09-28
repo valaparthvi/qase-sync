@@ -6,9 +6,12 @@ rewrite the specs. It ships as an npm package with a `bin`, so consuming project
 rather than vendoring it. `README.md` is the conceptual doc; `test/` holds a stubbed-API
 golden test with its own fixture project.
 
-It was extracted from `.github/scripts/qase-sync/` in `rancher/rancher-turtles-e2e`, which
-still carries a copy on its `qase-sync-2` branch along with the `qase-id-check.yaml` workflow
-that runs it monthly. Changes here do not reach that copy.
+**What you change here runs in other people's repositories.** It was extracted from
+`.github/scripts/qase-sync/` in `rancher/rancher-turtles-e2e`, which no longer vendors it:
+that repo's `.github/workflows/qase-id-check.yaml` now runs
+`npx --yes "github:valaparthvi/qase-sync#${TOOL_REF}"` on a monthly schedule. Consumers
+install straight from git — there is no npm registry involved — and pin a tag, so a change
+reaches them when it is *tagged*, not when it is merged. See constraint 12.
 
 Read the script's header docstring and `README.md` first. Verify anything below against the
 code before relying on it — this brief may have aged.
@@ -21,6 +24,11 @@ code before relying on it — this brief may have aged.
    irrelevant and anchoring anything to it is unambiguously wrong. There is no config at this
    repo's root — only `test/fixture` has one. Do not hardcode spec paths such as
    `tests/cypress/latest/e2e`.
+
+   The walk goes **up** only. A config sitting *below* the working directory is invisible, and
+   where the caller stands is the whole of what decides which project gets read. Deliberate: a
+   downward scan would find several configs in a monorepo and have to guess between them. The
+   symptom of "fixing" this is a run that silently syncs the wrong project.
 
 2. **Two wrapper shapes, detected per test, never configured.**
    `qase(651, it('t', cb))` and `it(qase(651, 't'), cb)` are both valid and one project —
@@ -71,9 +79,36 @@ code before relying on it — this brief may have aged.
    breaks the file — this happened once with a `**/legacy/**` glob in a JSON example.
    Never put `*/` in that block.
 
+The last three are about the package rather than the program. They are the easy ways to ship
+something broken while everything here stays green.
+
+10. **The published surface is three files.** `files` in `package.json` ships `qase-sync.mjs`
+    and `README.md`; npm adds `package.json` itself. `test/`, `test/fixture` and this brief
+    are deliberately left behind. So splitting the script into modules, or adding any file it
+    reads at runtime, passes `npm test` here and breaks every consumer — `npx` resolves a bin
+    whose imports are not in the tarball. Keep it one file, or update `files` and prove it
+    with `npm pack --dry-run`.
+
+11. **The bin contract: shebang, mode, strict arguments.** Line 1 is `#!/usr/bin/env node`,
+    the file is committed mode 755, and `bin` points at it. Drop any of the three and nothing
+    fails locally while every `npx qase-sync` breaks.
+
+    Unknown arguments exit 2 rather than being ignored. Do not soften that into a warning:
+    npx forwards a `--` through as a literal argument, so `npx qase-sync -- --fix` arrives as
+    unparseable input, and if unknown arguments were ignored the run would quietly *report*
+    where the caller asked it to *repair* — and a clean-looking report is indistinguishable
+    from a successful fix. The rejection is what makes that mistake visible.
+
+12. **Consumers pin git tags, so merging is not releasing.** `v1.0.0` is `a9b5e7c`, and
+    rancher-turtles-e2e defaults its `TOOL_REF` to it. Nothing on `main` reaches anyone until
+    a new tag is pushed. Do not *move* an existing tag to ship a fix — that silently changes
+    what a consumer is already running. Cut a new one. A git install also resolves `ts-morph`
+    fresh rather than from this repo's lockfile, so the lockfile constrains nothing
+    downstream; the tag is the only thing holding a consumer steady.
+
 # Verification
 
-Qase API credentials are usually not available, and are not needed for the first four steps.
+Qase API credentials are usually not available, and are not needed for the first five steps.
 Do them in order.
 
 1. `node --check qase-sync.mjs`
@@ -100,23 +135,36 @@ Do them in order.
    the script over a real Cypress checkout with an empty stub —
    `globalThis.fetch = async () => ({ok: true, json: async () => ({status: true, result: {total: 0, entities: []}})})`
    — which pushes every test in that repo through the parser and printers and reports them all
-   as missing. rancher-turtles-e2e gives ~381 tests and ~790 lines of output. Diff it against
+   as missing. rancher-turtles-e2e gives ~382 tests and ~793 lines of output. Diff it against
    the same run on the pre-change script.
 
-5. **Live run**, if you have a token, from a consuming project's root with `QASE_PROJECT_CODE`
-   unset so its config is the only source:
+5. **If you added a file, or touched `package.json` or the argument parsing**, check the
+   package rather than the program — see constraints 10 and 11, neither of which any test
+   above can catch:
+
+   ```
+   npm pack --dry-run          # exactly package.json, qase-sync.mjs, README.md
+   cd "$(mktemp -d)" && npm init -y && npm i -D ~/Desktop/qase-sync && npx qase-sync --help
+   ```
+
+   The second line is the only check that exercises the shebang, the mode bit, the `bin` entry
+   and the `files` allowlist together — which is how a consumer actually reaches the tool.
+
+6. **Live run**, if you have a token, from a consuming project — standing at or below its
+   `qase-sync.config.json` — with `QASE_PROJECT_CODE` unset so that config is the only source:
 
    ```
    QASE_API_TOKEN=<token> npx qase-sync
    ```
 
    For rancher-turtles-e2e the baseline as of 2026-09-28 was: `168 suites, 420 cases`,
-   `381 tests in 39 file(s)`, `Wrapper shapes: test 367`, 3 stale / 14 missing / 0 duplicate /
+   `382 tests in 39 file(s)`, `Wrapper shapes: test 368`, 3 stale / 14 missing / 0 duplicate /
    26 qase-only / 0 mismatched / 4 manual, exit 1. That is a fact about that repo on that day,
    not about this one — expect it to have moved, and re-baseline rather than assuming a
-   regression.
+   regression. The drift counts in particular were recorded against 381 tests a few hours
+   before the count itself moved, so treat them as approximate.
 
-6. **Never run `--fix` against a checkout you care about.** Copy it to a scratch directory,
+7. **Never run `--fix` against a checkout you care about.** Copy it to a scratch directory,
    run there, and inspect `git diff`.
 
 # Reporting
