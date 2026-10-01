@@ -99,7 +99,7 @@ something broken while everything here stays green.
     where the caller asked it to *repair* — and a clean-looking report is indistinguishable
     from a successful fix. The rejection is what makes that mistake visible.
 
-12. **Consumers pin git tags, so merging is not releasing.** `v1.0.0` is `a9b5e7c`, and
+12. **Consumers pin git tags, so merging is not releasing.** `v1.0.0` is `3024232`, and
     rancher-turtles-e2e defaults its `TOOL_REF` to it. Nothing on `main` reaches anyone until
     a new tag is pushed. Do not *move* an existing tag to ship a fix — that silently changes
     what a consumer is already running. Cut a new one. A git install also resolves `ts-morph`
